@@ -95,7 +95,7 @@ final class PromotionForm
                             ->schema([
                                 DateTimePicker::make('deactivated_at')
                                     ->label('Deactivated At')
-                                    ->helperText('Set a date to deactivate this promotion. Leave empty for active.'),
+                                    ->helperText('Set to deactivate this promotion. Leave empty for active.'),
 
                                 Toggle::make('is_stackable')
                                     ->label('Stackable')

@@ -59,9 +59,9 @@ final class PriceListInfolist
                             ->schema([
                                 TextEntry::make('deactivated_at')
                                     ->label('Status')
+                                    ->formatStateUsing(fn ($state): string => $state ? 'Deactivated at ' . $state->format('d M Y H:i') : 'Active')
                                     ->badge()
-                                    ->formatStateUsing(fn ($state) => $state === null ? 'Active' : 'Deactivated')
-                                    ->color(fn ($state) => $state === null ? 'success' : 'danger'),
+                                    ->color(fn ($state): string => $state ? 'danger' : 'success'),
 
                                 IconEntry::make('is_default')
                                     ->label('Default Price List')

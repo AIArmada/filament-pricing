@@ -12,7 +12,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 final class PromotionsTable
 {
@@ -48,9 +47,9 @@ final class PromotionsTable
 
                 TextColumn::make('deactivated_at')
                     ->label('Status')
+                    ->formatStateUsing(fn ($state): string => $state ? 'Deactivated' : 'Active')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => $state === null ? 'Active' : 'Deactivated')
-                    ->color(fn ($state) => $state === null ? 'success' : 'danger'),
+                    ->color(fn ($state): string => $state ? 'danger' : 'success'),
 
                 TextColumn::make('starts_at')
                     ->label('Starts')
@@ -72,12 +71,7 @@ final class PromotionsTable
 
                 TernaryFilter::make('deactivated_at')
                     ->label('Status')
-                    ->trueLabel('Active')
-                    ->falseLabel('Deactivated')
-                    ->queries(
-                        true: fn (Builder $query) => $query->whereNull('deactivated_at'),
-                        false: fn (Builder $query) => $query->whereNotNull('deactivated_at'),
-                    ),
+                    ->nullable(),
             ])
             ->actions([
                 Actions\ViewAction::make(),
