@@ -9,6 +9,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 final class PriceListsTable
 {
@@ -41,9 +42,9 @@ final class PriceListsTable
 
                 TextColumn::make('deactivated_at')
                     ->label('Status')
-                    ->formatStateUsing(fn ($state): string => $state ? 'Deactivated' : 'Active')
                     ->badge()
-                    ->color(fn ($state): string => $state ? 'danger' : 'success'),
+                    ->formatStateUsing(fn ($state) => $state === null ? 'Active' : 'Deactivated')
+                    ->color(fn ($state) => $state === null ? 'success' : 'danger'),
 
                 TextColumn::make('starts_at')
                     ->label('Starts')
@@ -59,7 +60,12 @@ final class PriceListsTable
             ->filters([
                 TernaryFilter::make('deactivated_at')
                     ->label('Status')
-                    ->nullable(),
+                    ->trueLabel('Active')
+                    ->falseLabel('Deactivated')
+                    ->queries(
+                        true: fn (Builder $query) => $query->whereNull('deactivated_at'),
+                        false: fn (Builder $query) => $query->whereNotNull('deactivated_at'),
+                    ),
 
                 TernaryFilter::make('is_default')
                     ->label('Default'),

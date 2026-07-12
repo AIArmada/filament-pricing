@@ -75,7 +75,7 @@ final class PriceListForm
                             ->schema([
                                 DateTimePicker::make('deactivated_at')
                                     ->label('Deactivated At')
-                                    ->helperText('Set to deactivate this price list. Leave empty for active.'),
+                                    ->helperText('Set a date to deactivate this price list. Leave empty for active.'),
 
                                 Toggle::make('is_default')
                                     ->label('Default Price List')
