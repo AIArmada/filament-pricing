@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace AIArmada\FilamentPricing\Widgets;
 
 use AIArmada\Pricing\Models\PriceList;
-use AIArmada\Pricing\Support\PricingOwnerScope;
 use AIArmada\Promotions\Models\Promotion;
-use AIArmada\Promotions\Support\PromotionsOwnerScope;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -17,7 +15,7 @@ final class PricingStatsWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $activePriceLists = PricingOwnerScope::applyToOwnedQuery(PriceList::query())
+        $activePriceLists = PriceList::query()
             ->active()
             ->count();
 
@@ -31,7 +29,7 @@ final class PricingStatsWidget extends BaseWidget
         if (class_exists(Promotion::class)) {
             $promotionQuery = Promotion::query();
 
-            if (PromotionsOwnerScope::isEnabled()) {
+            if (config('promotions.owner.enabled', true)) {
                 $promotionQuery = $promotionQuery->forOwner();
             }
 
