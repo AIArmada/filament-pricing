@@ -80,8 +80,8 @@ All resources and pages are grouped under the "Pricing" navigation group:
 ### Required
 
 - `aiarmada/pricing` - Core pricing engine
-- `filament/filament` ^5.8.1 - Filament admin panel
-- `filament/spatie-laravel-settings-plugin` ^5.8.1 - Settings management
+- `filament/filament` ^5.0 - Filament admin panel
+- `filament/spatie-laravel-settings-plugin` ^5.0 - Settings management
 
 ### Optional
 
@@ -98,7 +98,7 @@ The plugin automatically enables features based on installed packages:
 // Promotion administration is registered by aiarmada/filament-promotions.
 
 // PriceSimulator - only if products package is installed
-if (class_exists('\\AIArmada\\Products\\Models\\Product')) {
+if (class_exists('\\AIArmada\\Products\\Models\\Product') && class_exists('\\AIArmada\\Products\\Models\\Variant')) {
     $pages[] = Pages\PriceSimulator::class;
 }
 ```

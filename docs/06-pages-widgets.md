@@ -8,7 +8,7 @@ title: Pages & Widgets
 
 Settings page for configuring pricing defaults. Pricing settings are a single global row shared by every tenant, so the page requires the `filament-pricing.authorization.settings_ability` ability (default `pricing.manage-settings`, defined via a `Gate` in the host app). Saves are validated server-side against the form rules.
 
-> **warning**
+> [!WARNING]
 > Any ability holder changes pricing defaults for all tenants. Keep the ability narrowly assigned.
 
 ### Location
@@ -106,7 +106,7 @@ Interactive price calculation testing tool.
 
 ### Requirements
 
-- `aiarmada/products` is optional. When it is unavailable, the page renders a disabled state instead of attempting product or variant queries.
+- `aiarmada/products` is optional. When it is unavailable, the plugin does not register the page (the page also ships a disabled placeholder for manual registration).
 - Optional: `aiarmada/customers` for customer selection
 
 ### Location
@@ -152,49 +152,23 @@ public static function getNavigationSort(): ?int
 ```php
 public function calculate(): void
 {
-    // Input is re-validated server-side (bypassable through direct Livewire calls)
-    $input = self::validatedSimulationInput($this->data ?? []);
-
-    if ($input === null) {
-        $this->result = null;
-
-        return;
-    }
-
-    $owner = OwnerContext::resolve();
-    $includeGlobal = (bool) config('products.features.owner.include_global', false);
-
-    // Get priceable based on type — always owner-scoped
-    $priceable = $input['product_type'] === 'product'
-        ? OwnerQuery::applyToEloquentBuilder(Product::query(), $owner, $includeGlobal)->find($input['id'])
-        : Variant::query()
-            ->whereHas('product', fn ($q) => OwnerQuery::applyToEloquentBuilder($q, $owner, $includeGlobal))
-            ->find($input['id']);
-
-    if (! $priceable) {
-        $this->result = null;
-
-        return;
-    }
+    // Get priceable based on type
+    $priceable = $data['product_type'] === 'product'
+        ? Product::find($data['product_id'])
+        : Variant::find($data['variant_id']);
 
     // Build context
     $context = [];
-
     if ($customer) {
-        $context['customer_id'] = (string) $customer->getKey();
+        $context['customer_id'] = $customer->id;
     }
-
-    if ($effectiveAt instanceof DateTimeInterface) {
+    if ($effectiveAt) {
         $context['effective_at'] = $effectiveAt;
     }
 
-    // Calculate — named arguments, item must implement Priceable
+    // Calculate
     $calculator = app(PriceCalculatorInterface::class);
-    $result = $calculator->calculate(
-        item: $priceable,
-        quantity: $input['quantity'],
-        context: $context,
-    );
+    $result = $calculator->calculate($priceable, $quantity, $context);
 
     // Store result for display
     $this->result = [
@@ -236,10 +210,7 @@ Displays calculation results using Filament Infolist components:
         </div>
     @else
         <div class="mt-6">
-            <x-filament::section>
-                <x-slot name="heading">Ready to Calculate</x-slot>
-                <!-- inline calculator icon + hint copy -->
-            </x-filament::section>
+            <!-- Ready state with calculator icon -->
         </div>
     @endif
 </x-filament-panels::page>
@@ -337,29 +308,26 @@ protected function getStats(): array
 
 ### Customization
 
-> **warning**
-> `PricingStatsWidget` is `final`. `class CustomPricingStatsWidget extends PricingStatsWidget` is a fatal error.
-
-Write your own `StatsOverviewWidget` and register it on the panel instead:
+To customize the widget, extend it:
 
 ```php
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\StatsOverviewWidget;
-use Filament\Widgets\StatsOverviewWidget\Stat;
+use AIArmada\FilamentPricing\Widgets\PricingStatsWidget as BaseWidget;
 
-class CustomPricingStatsWidget extends StatsOverviewWidget
+class CustomPricingStatsWidget extends BaseWidget
 {
     protected ?string $pollingInterval = '60s';
 
     protected function getStats(): array
     {
-        return [
-            Stat::make('Active Price Lists', number_format(\AIArmada\Pricing\Models\PriceList::query()->active()->count()))
-                ->description('Currently active')
-                ->descriptionIcon('heroicon-m-currency-dollar')
-                ->color('info'),
-        ];
+        $stats = parent::getStats();
+
+        // Add custom stats
+        $stats[] = Stat::make('Custom Stat', '100')
+            ->description('Custom description');
+
+        return $stats;
     }
 }
 ```
