@@ -87,25 +87,24 @@ private function resolveOwner(): ?Model
     return OwnerContext::resolve();
 }
 
-// Each simulator search applies owner scoping inline:
-$query = OwnerQuery::applyToEloquentBuilder(
-    Product::query(),
-    $owner,
-    (bool) config('products.features.owner.include_global', false),
-);
+private function customerIncludesGlobal(): bool
+{
+    return (bool) config('customers.features.owner.include_global', false);
+}
 ```
 
 This is applied to:
-- Product searches
-- Variant searches
-- Customer searches (if package installed)
+- Product searches (`products.features.owner.include_global`)
+- Variant searches, via `whereHas('product', ...)` on the owning product
+- Customer searches, which use `customers.features.owner.include_global` instead
 
 ## Widget Scoping
 
 The `PricingStatsWidget` applies owner scoping:
 
 ```php
-$activePriceLists = PriceList::query()->active()->count(); // OwnerScope global scope applies
+// The global OwnerScope on the model does the scoping; the widget adds no extra filter
+$activePriceLists = PriceList::query()->active()->count();
 
 // Promotion administration is scoped by aiarmada/filament-promotions.
 ```
@@ -140,17 +139,20 @@ namespace App\Http\Middleware;
 use AIArmada\CommerceSupport\Support\OwnerContext;
 use Closure;
 use Filament\Facades\Filament;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class SetOwnerContext
 {
-    public function handle($request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
         $tenant = Filament::getTenant();
-        
+
         if ($tenant) {
+            // HTTP-only API. There is no OwnerContext::set() or ::clear().
             OwnerContext::setForRequest($tenant);
         }
-        
+
         return $next($request);
     }
 }
@@ -165,15 +167,15 @@ Verify scoping works correctly:
 it('scopes price lists to current owner', function () {
     $tenant1 = Tenant::factory()->create();
     $tenant2 = Tenant::factory()->create();
-    
-    $list1 = OwnerContext::withOwner($tenant1, fn () => PriceList::create(['name' => 'T1', 'slug' => 't1']));
-    $list2 = OwnerContext::withOwner($tenant2, fn () => PriceList::create(['name' => 'T2', 'slug' => 't2']));
 
-    OwnerContext::setForRequest($tenant1);
-    
-    livewire(ListPriceLists::class)
-        ->assertCanSeeTableRecords([$list1])
-        ->assertCanNotSeeTableRecords([$list2]);
+    $list1 = PriceList::factory()->for($tenant1, 'owner')->create();
+    $list2 = PriceList::factory()->for($tenant2, 'owner')->create();
+
+    OwnerContext::withOwner($tenant1, function () use ($list1, $list2): void {
+        livewire(ListPriceLists::class)
+            ->assertCanSeeTableRecords([$list1])
+            ->assertCanNotSeeTableRecords([$list2]);
+    });
 });
 ```
 
@@ -187,6 +189,7 @@ Enable multitenancy via config or environment:
     'owner' => [
         'enabled' => env('PRICING_OWNER_ENABLED', false),
         'include_global' => false,
+        'auto_assign_on_create' => true,
     ],
 ],
 ```
@@ -198,17 +201,20 @@ PRICING_OWNER_ENABLED=true
 
 ## Global Records
 
-When `include_global` is `true`, queries include records where `owner_type` and `owner_id` are both `null`.
+`owner = null` means global-only — it never means "all owners". When `include_global` is
+`true`, an owner-scoped query returns that owner's rows *plus* the ownerless ones; with
+`include_global` false they stay invisible. `PriceList::globalOnly()` returns only the
+ownerless rows, and `->withoutOwnerScope()` drops the global scope entirely for privileged
+reads.
 
-This is useful for:
-- Default price lists shared across all tenants
-- Global pricing records applicable to everyone
-
-To create global records, clear the owner context first:
+To create global records, run the write inside an explicit global context:
 
 ```php
+use AIArmada\CommerceSupport\Support\OwnerContext;
+
 $globalList = OwnerContext::withOwner(null, fn () => PriceList::create([
     'name' => 'Global Default',
+    'slug' => 'global-default',
     'is_default' => true,
     // owner_type and owner_id remain null
 ]));
